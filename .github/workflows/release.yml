@@ -10,16 +10,8 @@ permissions:
 
 jobs:
   package:
-    name: Package macOS ${{ matrix.arch }}
+    name: Package universal macOS archives
     runs-on: macos-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - arch: arm64
-            bun_target: bun-darwin-arm64
-          - arch: x86_64
-            bun_target: bun-darwin-x64
     steps:
       - uses: actions/checkout@v4
 
@@ -36,22 +28,28 @@ jobs:
 
       - name: Build standalone executables
         run: |
-          mkdir -p release/frontend release/backend/libexec
+          mkdir -p staging/frontend/bin staging/backend/libexec release
 
-          bun build packages/frontend/src/ui/app.ts --compile --target="${{ matrix.bun_target }}" --outfile=release/frontend/agent-console
-          bun build packages/backend/src/backend.ts --compile --target="${{ matrix.bun_target }}" --outfile=release/backend/libexec/agent-console-backend
-          bun build packages/backend/src/tmux-hook.ts --compile --target="${{ matrix.bun_target }}" --outfile=release/backend/libexec/agent-console-backend-tmux-hook
+          bun build packages/frontend/src/ui/app.ts --compile --target=bun-darwin-arm64 --outfile=staging/frontend/bin/agent-console-darwin-arm64
+          bun build packages/frontend/src/ui/app.ts --compile --target=bun-darwin-x64 --outfile=staging/frontend/bin/agent-console-darwin-x86_64
+          bun build packages/backend/src/backend.ts --compile --target=bun-darwin-arm64 --outfile=staging/backend/libexec/agent-console-backend-darwin-arm64
+          bun build packages/backend/src/backend.ts --compile --target=bun-darwin-x64 --outfile=staging/backend/libexec/agent-console-backend-darwin-x86_64
+          bun build packages/backend/src/tmux-hook.ts --compile --target=bun-darwin-arm64 --outfile=staging/backend/libexec/agent-console-backend-tmux-hook-darwin-arm64
+          bun build packages/backend/src/tmux-hook.ts --compile --target=bun-darwin-x64 --outfile=staging/backend/libexec/agent-console-backend-tmux-hook-darwin-x86_64
 
-      - name: Package release archives
+      - name: Package universal release archives
         run: |
-          tar -C release/frontend -czf "release/agent-console-darwin-${{ matrix.arch }}.tar.gz" agent-console
-          tar -C release/backend -czf "release/agent-console-backend-darwin-${{ matrix.arch }}.tar.gz" libexec
-          shasum -a 256 release/*.tar.gz > "release/agent-console-${{ matrix.arch }}.sha256"
+          tar -C staging/frontend -czf release/agent-console-darwin-universal.tar.gz bin
+          tar -C staging/backend -czf release/agent-console-backend-darwin-universal.tar.gz libexec
+          shasum -a 256 release/agent-console-darwin-universal.tar.gz > release/agent-console.sha256
+          shasum -a 256 release/agent-console-backend-darwin-universal.tar.gz > release/agent-console-backend.sha256
 
       - uses: actions/upload-artifact@v4
         with:
-          name: release-${{ matrix.arch }}
-          path: release/
+          name: release-archives
+          path: |
+            release/*.tar.gz
+            release/*.sha256
           if-no-files-found: error
 
   publish:
@@ -61,19 +59,28 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          pattern: release-*
+          name: release-archives
           path: release
-          merge-multiple: true
 
-      - name: Verify release files
+      - name: Verify release archives
         run: |
-          test -f release/agent-console-darwin-arm64.tar.gz
-          test -f release/agent-console-darwin-x86_64.tar.gz
-          test -f release/agent-console-backend-darwin-arm64.tar.gz
-          test -f release/agent-console-backend-darwin-x86_64.tar.gz
-          test -f release/agent-console-arm64.sha256
-          test -f release/agent-console-x86_64.sha256
+          set -euo pipefail
+          shasum -a 256 -c release/agent-console.sha256
+          shasum -a 256 -c release/agent-console-backend.sha256
+
+          mkdir frontend backend
+          tar -C frontend -xzf release/agent-console-darwin-universal.tar.gz
+          tar -C backend -xzf release/agent-console-backend-darwin-universal.tar.gz
+
+          test -x frontend/bin/agent-console-darwin-arm64
+          test -x frontend/bin/agent-console-darwin-x86_64
+          test -x backend/libexec/agent-console-backend-darwin-arm64
+          test -x backend/libexec/agent-console-backend-darwin-x86_64
+          test -x backend/libexec/agent-console-backend-tmux-hook-darwin-arm64
+          test -x backend/libexec/agent-console-backend-tmux-hook-darwin-x86_64
 
       - uses: softprops/action-gh-release@v2
         with:
-          files: release/*
+          files: |
+            release/*.tar.gz
+            release/*.sha256

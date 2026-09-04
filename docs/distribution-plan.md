@@ -24,16 +24,14 @@ Then configure TPM with `OWNER/tmux-agent-console` and run `agent-console` to op
 
 ## Release artifact contract
 
-A version tag, such as `v0.1.0`, produces four GitHub Release archives from `agent-console`.
+A version tag, such as `v0.1.0`, produces two universal GitHub Release archives from `agent-console`. Each archive contains executables built with both `bun-darwin-arm64` and `bun-darwin-x64`; Homebrew installs the executable matching the host architecture.
 
-| Archive | Build target | Required contents |
-| --- | --- | --- |
-| `agent-console-darwin-arm64.tar.gz` | `bun-darwin-arm64` | `agent-console` |
-| `agent-console-darwin-x86_64.tar.gz` | `bun-darwin-x64` | `agent-console` |
-| `agent-console-backend-darwin-arm64.tar.gz` | `bun-darwin-arm64` | `libexec/agent-console-backend`, `libexec/agent-console-backend-tmux-hook` |
-| `agent-console-backend-darwin-x86_64.tar.gz` | `bun-darwin-x64` | `libexec/agent-console-backend`, `libexec/agent-console-backend-tmux-hook` |
+| Archive | Required contents |
+| --- | --- |
+| `agent-console-darwin-universal.tar.gz` | `bin/agent-console-darwin-arm64`, `bin/agent-console-darwin-x86_64` |
+| `agent-console-backend-darwin-universal.tar.gz` | `libexec/agent-console-backend-darwin-arm64`, `libexec/agent-console-backend-darwin-x86_64`, `libexec/agent-console-backend-tmux-hook-darwin-arm64`, `libexec/agent-console-backend-tmux-hook-darwin-x86_64` |
 
-Each archive has a published SHA-256 checksum. Homebrew formulas download these archives and use the matching checksum.
+Each archive has a published SHA-256 checksum manifest. Homebrew formulas download one universal archive and use its matching checksum.
 
 The TPM plugin is source-only. It is distributed by its own Git repository, not inside the Homebrew release archives.
 
@@ -49,8 +47,8 @@ The TPM plugin is source-only. It is distributed by its own Git repository, not 
 ### AC-02 — Cross-platform release build
 
 - **Repository:** `agent-console`
-- **Scope:** Add tag-triggered automation that compiles frontend, backend, and backend tmux-hook executables for `bun-darwin-arm64` and `bun-darwin-x64`; package, checksum, and upload the four archives.
-- **Done when:** A version tag produces a GitHub Release containing all four archives and their SHA-256 values.
+- **Scope:** Add tag-triggered automation that compiles frontend, backend, and backend tmux-hook executables for `bun-darwin-arm64` and `bun-darwin-x64`; package both architectures into frontend and backend universal archives, checksum, and upload them.
+- **Done when:** A version tag produces a GitHub Release containing both universal archives and their SHA-256 checksum manifests.
 - **Dependencies:** AC-01.
 
 ### AC-03 — Backend Homebrew service
