@@ -1,0 +1,79 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    name: Package macOS ${{ matrix.arch }}
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            bun_target: bun-darwin-arm64
+          - arch: x86_64
+            bun_target: bun-darwin-x64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.14"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: "10.21.0"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build standalone executables
+        run: |
+          mkdir -p release/frontend release/backend/libexec
+
+          bun build packages/frontend/src/ui/app.ts --compile --target="${{ matrix.bun_target }}" --outfile=release/frontend/agent-console
+          bun build packages/backend/src/backend.ts --compile --target="${{ matrix.bun_target }}" --outfile=release/backend/libexec/agent-console-backend
+          bun build packages/backend/src/tmux-hook.ts --compile --target="${{ matrix.bun_target }}" --outfile=release/backend/libexec/agent-console-backend-tmux-hook
+
+      - name: Package release archives
+        run: |
+          tar -C release/frontend -czf "release/agent-console-darwin-${{ matrix.arch }}.tar.gz" agent-console
+          tar -C release/backend -czf "release/agent-console-backend-darwin-${{ matrix.arch }}.tar.gz" libexec
+          shasum -a 256 release/*.tar.gz > "release/agent-console-${{ matrix.arch }}.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.arch }}
+          path: release/
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub Release
+    needs: package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: release
+          merge-multiple: true
+
+      - name: Verify release files
+        run: |
+          test -f release/agent-console-darwin-arm64.tar.gz
+          test -f release/agent-console-darwin-x86_64.tar.gz
+          test -f release/agent-console-backend-darwin-arm64.tar.gz
+          test -f release/agent-console-backend-darwin-x86_64.tar.gz
+          test -f release/agent-console-arm64.sha256
+          test -f release/agent-console-x86_64.sha256
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
