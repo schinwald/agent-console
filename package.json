@@ -1,0 +1,27 @@
+{
+  "name": "agent-console",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "bun test && zsh -n packages/frontend/src/tmux/tmux-to-backend/on-window-changed.zsh && bash -n packages/frontend/src/agent-console-frontend.tmux",
+    "test:packages": "pnpm -r --if-present test",
+    "build": "zsh scripts/build.zsh",
+    "dev:setup": "zsh scripts/dev-setup.zsh",
+    "dev:backend": "zsh scripts/dev-backend.zsh",
+    "dev:frontend": "zsh scripts/dev-frontend.zsh",
+    "dev:check": "zsh scripts/dev-check.zsh",
+    "changeset:version": "changeset version",
+    "release": "pnpm build && pnpm test:packages && changeset publish"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.21.0",
+  "dependencies": {
+    "tsx": "^4.23.12"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^3.0.1"
+  }
+}

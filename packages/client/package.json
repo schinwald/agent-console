@@ -1,0 +1,12 @@
+{
+  "name": "@agent-console/client",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./profiler": "./src/profiler.ts"
+  },
+  "dependencies": {
+    "@agent-console/protocol": "workspace:*"
+  }
+}

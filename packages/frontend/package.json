@@ -1,0 +1,18 @@
+{
+  "name": "agent-console",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "agent-console": "dist/agent-console"
+  },
+  "scripts": {
+    "dev": "pnpm tsx src/ui/app.ts",
+    "start": "node dist/agent-console",
+    "build": "bun build src/ui/app.ts --compile --outfile dist/agent-console",
+    "test": "bun test src/ui src/tmux/tmux.integration.test.ts"
+  },
+  "dependencies": {
+    "@agent-console/client": "workspace:*",
+    "@agent-console/protocol": "workspace:*"
+  }
+}

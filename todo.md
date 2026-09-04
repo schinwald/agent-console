@@ -1,0 +1,4 @@
+- add notifications
+- add agent persistence
+- support more agents
+- clean up code
