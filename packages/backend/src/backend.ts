@@ -115,14 +115,14 @@ function broadcastAgentCreated(agent: AgentCreated): void {
 
 function searchAgents(query: string): AgentMetadata[] {
   const normalized = query.trim().toLowerCase();
-  return [...agents.values()].filter((agent) => {
+  return [...agents.values()].map(withBinding).filter((agent) => {
     if (!normalized) return true;
     return Object.values(agent)
       .filter((value) => ['string', 'number', 'boolean'].includes(typeof value))
       .join(' ')
       .toLowerCase()
       .includes(normalized);
-  }).map(withBinding);
+  });
 }
 
 store.subscribe(broadcast);
@@ -137,7 +137,7 @@ store.onSubmission((submission) => {
       ? { session: boundAgent.tmuxSession, window: boundAgent.tmuxWindow, pane: boundAgent.tmuxPane, pid: boundAgent.pid }
       : null,
   });
-  if (boundAgent) navigateToAgent(boundAgent);
+  if (boundAgent) navigateToAgent(boundAgent, activeTmuxContext);
 });
 
 function handleCommand(socket: Socket, command: Command): void {

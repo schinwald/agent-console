@@ -9,6 +9,7 @@ const agents: Agent[] = [
 
 describe('frontend selection', () => {
   test('filters by session, status, or description', () => {
+    expect(filterAgents(agents, 'alpha')).toEqual([agents[0]]);
     expect(filterAgents(agents, 'worker')).toEqual([agents[1]]);
     expect(filterAgents(agents, 'IDLE')).toEqual([agents[0]]);
   });

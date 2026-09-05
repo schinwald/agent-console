@@ -6,6 +6,7 @@ export type TmuxContext = { session?: string; window?: string; pane?: string };
 export type TmuxBinding = TmuxContext;
 
 type TmuxPane = TmuxBinding & { pid: number };
+type TmuxClient = { tty: string; session: string };
 
 const debugTmux = (message: string, fields: Record<string, unknown> = {}): void => {
   logger.debug('tmux', message, fields);
@@ -84,6 +85,21 @@ export const isProcessInPane = (
   return false;
 };
 
+const listClients = (): TmuxClient[] => {
+  const args = ['list-clients', '-F', '#{client_tty}\\t#{session_name}'];
+  const result = runTmuxCommand(args);
+  debugTmux('client discovery command result', { command: `tmux ${tmuxArgs(args).join(' ')}`, ...result });
+  if (!result.success) return [];
+  return result.stdout
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => {
+      const [tty, session] = line.split('\\t');
+      return { tty, session };
+    })
+    .filter((client) => Boolean(client.tty && client.session));
+};
+
 const listPanes = (): TmuxPane[] => {
   const args = ['list-panes', '-a', '-F', '#{pane_pid}\\t#{session_name}\\t#{window_id}\\t#{pane_id}'];
   const result = runTmuxCommand(args);
@@ -134,13 +150,17 @@ export const refreshTmuxBindings = (agents: Iterable<AgentMetadata>): AgentMetad
   });
 };
 
-export const navigateToAgent = (agent: AgentMetadata): void => {
+export const navigateToAgent = (agent: AgentMetadata, sourceContext?: TmuxContext | null): void => {
   if (!agent.tmuxSession || !agent.tmuxWindow) return;
-  // launchd has no TMUX client context; target the session directly.
-  runTmux(['select-window', '-t', `${agent.tmuxSession}:${agent.tmuxWindow}`]);
-  if (agent.tmuxPane) {
-    runTmux(['select-pane', '-t', `${agent.tmuxSession}:${agent.tmuxWindow}.${agent.tmuxPane}`]);
-  }
+  const target = `${agent.tmuxSession}:${agent.tmuxWindow}`;
+  const sourceSession = sourceContext?.session;
+  const clients = listClients().filter((client) => !sourceSession || client.session === sourceSession);
+
+  // The backend runs under launchd, so it has no TMUX client context of its own.
+  // Switch the client(s) attached to the session from which the submission came.
+  runTmux(['select-window', '-t', target]);
+  if (agent.tmuxPane) runTmux(['select-pane', '-t', `${target}.${agent.tmuxPane}`]);
+  for (const client of clients) runTmux(['switch-client', '-c', client.tty, '-t', target]);
 };
 
 export const readActiveContext = (): TmuxContext => {

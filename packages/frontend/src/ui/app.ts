@@ -10,7 +10,7 @@ import {
 import { profileStart } from '@agent-console/client/profiler';
 import { getBoxWidth, getSessionWidth, truncateText } from './layout';
 import { specialKeys, type InputKey } from './input';
-import { clampSelection, moveSelection } from './selection';
+import { clampSelection, filterAgents, moveSelection } from './selection';
 import { statusStyles, visibleLength, workingFrames } from './render';
 import type { Agent, Status } from './types';
 import { parsePlacement } from '../placement';
@@ -50,7 +50,7 @@ const selectAgent = async (): Promise<Agent | null> => {
   const render = () => {
     const finishProfile = profileStart('frontend.render');
     const boxWidth = getBoxWidth(output.columns);
-    filteredAgents = agents;
+    filteredAgents = filterAgents(agents, searchQuery);
     const focusedId = viewState.focusId;
     const stateFocusedIndex = focusedId
       ? filteredAgents.findIndex((agent) => agent.id === focusedId)

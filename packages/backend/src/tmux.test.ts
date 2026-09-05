@@ -74,8 +74,8 @@ describe('tmux process binding', () => {
       navigateToAgent({ id: 'agent-1', tmuxSession: 'project', tmuxWindow: '@4' });
     });
 
-    expect(calls).toHaveLength(1);
-    expect(calls[0]).toEqual([
+    expect(calls).toHaveLength(2);
+    expect(calls[1]).toEqual([
       expect.arrayContaining(['tmux', 'select-window', '-t', 'project:@4']),
       { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' },
     ]);
@@ -89,6 +89,29 @@ describe('tmux process binding', () => {
         exitCode: 0,
         success: true,
       }),
+    ]);
+  });
+
+  test('switches clients attached to the submitting session', () => {
+    const calls: string[][] = [];
+    Bun.spawnSync = ((command: string[]) => {
+      calls.push(command);
+      if (command.includes('list-clients')) {
+        return tmuxResult(true, 0, '/dev/ttys001\\tcontrol\n/dev/ttys002\\tother\n', '');
+      }
+      return tmuxResult(true, 0, '', '');
+    }) as typeof Bun.spawnSync;
+
+    navigateToAgent(
+      { id: 'agent-1', tmuxSession: 'project', tmuxWindow: '@4', tmuxPane: '%4' },
+      { session: 'control' },
+    );
+
+    expect(calls).toEqual([
+      expect.arrayContaining(['tmux', 'list-clients']),
+      expect.arrayContaining(['tmux', 'select-window', '-t', 'project:@4']),
+      expect.arrayContaining(['tmux', 'select-pane', '-t', 'project:@4.%4']),
+      expect.arrayContaining(['tmux', 'switch-client', '-c', '/dev/ttys001', '-t', 'project:@4']),
     ]);
   });
 

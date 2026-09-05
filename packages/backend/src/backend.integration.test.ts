@@ -135,7 +135,12 @@ describe('manager backend socket', () => {
     const producer = await connect();
     send(producer, {
       type: 'agent.created',
-      data: { id: 'search-agent', status: 'working', summary: 'Fix billing retry' },
+      data: {
+        id: 'search-agent',
+        status: 'working',
+        summary: 'Fix billing retry',
+        tmuxSession: 'search-session',
+      },
     });
     await Bun.sleep(10);
 
@@ -145,7 +150,25 @@ describe('manager backend socket', () => {
       type: 'search-results',
       requestId: 'search-1',
       query: 'billing',
-      agents: [{ id: 'search-agent', status: 'working', summary: 'Fix billing retry' }],
+      agents: [{
+        id: 'search-agent',
+        status: 'working',
+        summary: 'Fix billing retry',
+        tmuxSession: 'search-session',
+      }],
+    });
+
+    send(search, { type: 'search', query: 'search-session', requestId: 'search-2' });
+    expect(await nextMessage(search)).toEqual({
+      type: 'search-results',
+      requestId: 'search-2',
+      query: 'search-session',
+      agents: [{
+        id: 'search-agent',
+        status: 'working',
+        summary: 'Fix billing retry',
+        tmuxSession: 'search-session',
+      }],
     });
     producer.destroy();
     search.destroy();
