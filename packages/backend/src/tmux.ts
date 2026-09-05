@@ -6,10 +6,18 @@ export type TmuxBinding = TmuxContext;
 
 type TmuxPane = TmuxBinding & { pid: number };
 
+export const resolveTmuxSocket = (
+  env: Record<string, string | undefined> = process.env,
+  uid: number = process.getuid?.() ?? 0,
+): string => env.AGENT_CONSOLE_TMUX_SOCKET ?? `/private/tmp/tmux-${uid}/default`;
+
+const tmuxArgs = (args: string[]): string[] => ['-S', resolveTmuxSocket(), ...args];
+
 const runTmux = (args: string[]): void => {
-  const command = `tmux ${args.join(' ')}`;
+  const resolvedArgs = tmuxArgs(args);
+  const command = `tmux ${resolvedArgs.join(' ')}`;
   try {
-    const stderr = execFileSync('tmux', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+    const stderr = execFileSync('tmux', resolvedArgs, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
     process.stderr.write(`[agent-console] tmux success command=${JSON.stringify(command)} stderr=${JSON.stringify(stderr)}\n`);
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
@@ -46,7 +54,7 @@ const listPanes = (): TmuxPane[] => {
   try {
     const output = execFileSync(
       'tmux',
-      ['list-panes', '-a', '-F', '#{pane_pid}\t#{session_name}\t#{window_id}\t#{pane_id}'],
+      tmuxArgs(['list-panes', '-a', '-F', '#{pane_pid}\t#{session_name}\t#{window_id}\t#{pane_id}']),
       { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
     );
     return output
@@ -101,7 +109,7 @@ export const navigateToAgent = (agent: AgentMetadata): void => {
 };
 
 export const readActiveContext = (): TmuxContext => {
-  const output = execFileSync('tmux', ['display-message', '-p', '#{session_name}\t#{window_id}\t#{pane_id}'], {
+  const output = execFileSync('tmux', tmuxArgs(['display-message', '-p', '#{session_name}\t#{window_id}\t#{pane_id}']), {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'ignore'],
   }).trim();
