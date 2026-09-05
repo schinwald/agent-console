@@ -84,3 +84,65 @@ jobs:
           files: |
             release/*.tar.gz
             release/*.sha256
+
+      - name: Check Homebrew tap token
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          test -n "$HOMEBREW_TAP_TOKEN" || {
+            echo 'HOMEBREW_TAP_TOKEN is required to update the Homebrew formulas.' >&2
+            exit 1
+          }
+
+      - name: Check out Homebrew tap
+        uses: actions/checkout@v4
+        with:
+          repository: schinwald/homebrew-agent-console
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-tap
+
+      - name: Update Homebrew formulas
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          FRONTEND_SHA256="$(shasum -a 256 release/agent-console-darwin-universal.tar.gz | awk '{print $1}')"
+          BACKEND_SHA256="$(shasum -a 256 release/agent-console-backend-darwin-universal.tar.gz | awk '{print $1}')"
+          export FRONTEND_SHA256 BACKEND_SHA256
+          python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          tag = os.environ['TAG']
+          formulas = (
+              ('Formula/agent-console.rb', 'agent-console-darwin-universal.tar.gz', os.environ['FRONTEND_SHA256']),
+              ('Formula/agent-console-backend.rb', 'agent-console-backend-darwin-universal.tar.gz', os.environ['BACKEND_SHA256']),
+          )
+
+          for relative_path, archive, sha256 in formulas:
+              formula = Path('homebrew-tap') / relative_path
+              contents = formula.read_text()
+              contents, url_replacements = re.subn(
+                  rf'(releases/download/)v[^/]+(/{re.escape(archive)})',
+                  rf'\g<1>{tag}\g<2>',
+                  contents,
+              )
+              contents, checksum_replacements = re.subn(
+                  r'(?m)^  sha256 "[0-9a-f]+"$',
+                  f'  sha256 "{sha256}"',
+                  contents,
+              )
+              if url_replacements != 1 or checksum_replacements != 1:
+                  raise SystemExit(
+                      f'{relative_path}: expected exactly one release URL and SHA-256 replacement; '
+                      f'found {url_replacements} URL and {checksum_replacements} SHA-256 matches.'
+                  )
+              formula.write_text(contents)
+          PY
+          git -C homebrew-tap diff --check
+          git -C homebrew-tap diff --quiet && exit 0
+          git -C homebrew-tap config user.name 'github-actions[bot]'
+          git -C homebrew-tap config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git -C homebrew-tap add Formula/agent-console.rb Formula/agent-console-backend.rb
+          git -C homebrew-tap commit -m "release: update Agent Console to ${TAG}"
+          git -C homebrew-tap push
