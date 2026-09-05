@@ -77,6 +77,7 @@ const listPanes = (): TmuxPane[] => {
 };
 
 export const discoverTmuxBindings = (agents: Iterable<AgentMetadata>): Map<string, TmuxBinding> => {
+  const list = [...agents];
   const panes = listPanes();
   debugTmux(`socket=${resolveTmuxSocket()} panes=${JSON.stringify(panes)}`);
   const parents = new Map<number, number | undefined>();
@@ -85,7 +86,7 @@ export const discoverTmuxBindings = (agents: Iterable<AgentMetadata>): Map<strin
     return parents.get(pid);
   };
   const bindings = new Map<string, TmuxBinding>();
-  for (const agent of agents) {
+  for (const agent of list) {
     if (typeof agent.pid !== 'number') continue;
     const pane = panes.find((candidate) => isProcessInPane(agent.pid, candidate.pid, parentOf));
     if (pane) bindings.set(agent.id, { session: pane.session, window: pane.window, pane: pane.pane });
