@@ -18,15 +18,44 @@ export const resolveTmuxSocket = (
 
 const tmuxArgs = (args: string[]): string[] => ['-S', resolveTmuxSocket(), ...args];
 
+type TmuxCommandResult = {
+  stdout: string;
+  stderr: string;
+  exitCode: number | null;
+  success: boolean;
+  error?: string;
+};
+
+const runTmuxCommand = (args: string[]): TmuxCommandResult => {
+  try {
+    const result = Bun.spawnSync(['tmux', ...tmuxArgs(args)], { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' });
+    const decode = (output: Uint8Array) => new TextDecoder().decode(output).trim();
+    return {
+      stdout: decode(result.stdout),
+      stderr: decode(result.stderr),
+      exitCode: result.exitCode,
+      success: result.success,
+    };
+  } catch (error) {
+    return {
+      stdout: '',
+      stderr: '',
+      exitCode: null,
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+};
+
 const runTmux = (args: string[]): void => {
   const resolvedArgs = tmuxArgs(args);
   const command = `tmux ${resolvedArgs.join(' ')}`;
-  try {
-    const stderr = execFileSync('tmux', resolvedArgs, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-    logger.info('tmux', 'command succeeded', { command, stderr });
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
-    logger.error('tmux', 'command failed', { command, error: detail });
+  const result = runTmuxCommand(args);
+  const fields = { command, ...result };
+  if (result.success) {
+    logger.info('tmux', 'command succeeded', fields);
+  } else {
+    logger.error('tmux', 'command failed', fields);
   }
 };
 
@@ -56,25 +85,20 @@ export const isProcessInPane = (
 };
 
 const listPanes = (): TmuxPane[] => {
-  try {
-    const output = execFileSync(
-      'tmux',
-      tmuxArgs(['list-panes', '-a', '-F', '#{pane_pid}\t#{session_name}\t#{window_id}\t#{pane_id}']),
-      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
-    );
-    return output
-      .trim()
-      .split('\n')
-      .filter(Boolean)
-      .map((line) => {
-        const [pid, session, window, pane] = line.split('\t');
-        return { pid: Number(pid), session, window, pane };
-      })
-      .filter((pane) => Number.isInteger(pane.pid) && pane.pid > 0);
-  } catch (error) {
-    logger.warn('tmux', 'pane discovery failed', { error: error instanceof Error ? error.message : String(error) });
+  const args = ['list-panes', '-a', '-F', '#{pane_pid}\t#{session_name}\t#{window_id}\t#{pane_id}'];
+  const result = runTmuxCommand(args);
+  if (!result.success) {
+    logger.warn('tmux', 'pane discovery failed', { command: `tmux ${tmuxArgs(args).join(' ')}`, ...result });
     return [];
   }
+  return result.stdout
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => {
+      const [pid, session, window, pane] = line.split('\t');
+      return { pid: Number(pid), session, window, pane };
+    })
+    .filter((pane) => Number.isInteger(pane.pid) && pane.pid > 0);
 };
 
 export const discoverTmuxBindings = (agents: Iterable<AgentMetadata>): Map<string, TmuxBinding> => {
@@ -118,11 +142,17 @@ export const navigateToAgent = (agent: AgentMetadata): void => {
 };
 
 export const readActiveContext = (): TmuxContext => {
-  const output = execFileSync('tmux', tmuxArgs(['display-message', '-p', '#{session_name}\t#{window_id}\t#{pane_id}']), {
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'ignore'],
-  }).trim();
-  const [session, window, pane] = output.split('\t');
+  const args = ['display-message', '-p', '#{session_name}\t#{window_id}\t#{pane_id}'];
+  const result = runTmuxCommand(args);
+  if (!result.success) {
+    logger.error('tmux', 'active context lookup failed', { command: `tmux ${tmuxArgs(args).join(' ')}`, ...result });
+    throw new Error(
+      result.exitCode === null
+        ? 'tmux active context lookup could not start'
+        : `tmux active context lookup failed with exit code ${result.exitCode}`,
+    );
+  }
+  const [session, window, pane] = result.stdout.split('\t');
   return { session, window, pane };
 };
 
