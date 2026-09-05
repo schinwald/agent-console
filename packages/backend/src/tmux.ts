@@ -66,7 +66,8 @@ const listPanes = (): TmuxPane[] => {
         return { pid: Number(pid), session, window, pane };
       })
       .filter((pane) => Number.isInteger(pane.pid) && pane.pid > 0);
-  } catch {
+  } catch (error) {
+    process.stderr.write(`[agent-console] tmux pane discovery failed error=${JSON.stringify(error instanceof Error ? error.message : String(error))}\n`);
     return [];
   }
 };
