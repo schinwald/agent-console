@@ -111,3 +111,5 @@ brew services start agent-console-backend
 ```
 
 The tmux hooks remain safe to re-run.
+
+See [releasing.md](releasing.md) for version tags, release assets, Homebrew updates, and post-release binding verification. See [debugging.md](debugging.md) for service and tmux diagnostics.

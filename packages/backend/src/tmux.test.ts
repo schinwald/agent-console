@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { isProcessInPane, navigateToAgent, resolveTmuxSocket } from './tmux';
+import { discoverTmuxBindings, isProcessInPane, navigateToAgent, resolveTmuxSocket } from './tmux';
 
 const originalSpawnSync = Bun.spawnSync;
 
@@ -53,6 +53,14 @@ describe('tmux process binding', () => {
   test('stops on process ancestry cycles and invalid ids', () => {
     expect(isProcessInPane(42, 10, parentLookup({ 42: 42 }))).toBe(false);
     expect(isProcessInPane(0, 10, parentLookup({}))).toBe(false);
+  });
+
+  test('parses literal backslash-t pane separators into bindings', () => {
+    Bun.spawnSync = (() => tmuxResult(true, 0, `${process.pid}\\tproject\\t@4\\t%4\n`, '')) as typeof Bun.spawnSync;
+
+    expect(discoverTmuxBindings([{ id: 'agent-1', pid: process.pid }])).toEqual(
+      new Map([['agent-1', { session: 'project', window: '@4', pane: '%4' }]]),
+    );
   });
 
   test('captures tmux stdout, stderr, and exit details on success', () => {
