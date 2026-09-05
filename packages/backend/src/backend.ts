@@ -260,7 +260,7 @@ const server = createServer((socket) => {
 });
 
 server.listen(communicationSocket, () => {
-  process.stdout.write(`manager backend listening on ${communicationSocket}\n`);
+  logger.info('backend', 'started', { socket: communicationSocket });
 });
 
 function shutdown(): void {

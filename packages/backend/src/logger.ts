@@ -11,7 +11,7 @@ export const createLogger = (
   const threshold = levels[level as LogLevel] ?? levels.info;
   const log = (eventLevel: LogLevel, component: string, message: string, fields: Record<string, unknown> = {}) => {
     if (levels[eventLevel] < threshold) return;
-    write(JSON.stringify({ level: eventLevel, component, message, ...fields }));
+    write(JSON.stringify({ ...fields, level: eventLevel, component, message }));
   };
   return {
     debug: (component: string, message: string, fields?: Record<string, unknown>) => log('debug', component, message, fields),

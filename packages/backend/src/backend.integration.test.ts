@@ -55,8 +55,9 @@ describe('manager backend socket', () => {
     await waitForSocket();
   });
 
-  afterAll(() => {
+  afterAll(async () => {
     backend.kill();
+    await backend.exited;
     if (existsSync(socketPath)) unlinkSync(socketPath);
   });
 

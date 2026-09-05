@@ -17,4 +17,21 @@ describe('backend logger', () => {
       socket: '/tmp/socket',
     });
   });
+
+  test('preserves reserved fields when event fields collide', () => {
+    const lines: string[] = [];
+    const logger = createLogger('debug', (line) => lines.push(line));
+
+    logger.warn('backend', 'started', {
+      level: 'debug',
+      component: 'tmux',
+      message: 'overridden',
+    });
+
+    expect(JSON.parse(lines[0])).toEqual({
+      level: 'warn',
+      component: 'backend',
+      message: 'started',
+    });
+  });
 });
