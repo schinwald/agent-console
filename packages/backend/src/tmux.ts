@@ -85,7 +85,7 @@ export const isProcessInPane = (
 };
 
 const listPanes = (): TmuxPane[] => {
-  const args = ['list-panes', '-a', '-F', '#{pane_pid}\t#{session_name}\t#{window_id}\t#{pane_id}'];
+  const args = ['list-panes', '-a', '-F', '#{pane_pid}\\t#{session_name}\\t#{window_id}\\t#{pane_id}'];
   const result = runTmuxCommand(args);
   const command = `tmux ${tmuxArgs(args).join(' ')}`;
   logger.debug('tmux', 'pane discovery command result', { command, ...result });
