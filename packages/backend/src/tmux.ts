@@ -97,7 +97,7 @@ const listPanes = (): TmuxPane[] => {
     .split('\n')
     .filter(Boolean)
     .map((line) => {
-      const [pid, session, window, pane] = line.split('\t');
+      const [pid, session, window, pane] = line.split('\\t');
       return { pid: Number(pid), session, window, pane };
     })
     .filter((pane) => Number.isInteger(pane.pid) && pane.pid > 0);
