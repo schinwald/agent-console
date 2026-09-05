@@ -6,6 +6,10 @@ export type TmuxBinding = TmuxContext;
 
 type TmuxPane = TmuxBinding & { pid: number };
 
+const debugTmux = (message: string): void => {
+  if (process.env.AGENT_CONSOLE_DEBUG === '1') process.stderr.write(`[agent-console:debug] ${message}\n`);
+};
+
 export const resolveTmuxSocket = (
   env: Record<string, string | undefined> = process.env,
   uid: number = process.getuid?.() ?? 0,
@@ -74,6 +78,7 @@ const listPanes = (): TmuxPane[] => {
 
 export const discoverTmuxBindings = (agents: Iterable<AgentMetadata>): Map<string, TmuxBinding> => {
   const panes = listPanes();
+  debugTmux(`socket=${resolveTmuxSocket()} panes=${JSON.stringify(panes)}`);
   const parents = new Map<number, number | undefined>();
   const parentOf = (pid: number): number | undefined => {
     if (!parents.has(pid)) parents.set(pid, processParent(pid));
@@ -85,6 +90,7 @@ export const discoverTmuxBindings = (agents: Iterable<AgentMetadata>): Map<strin
     const pane = panes.find((candidate) => isProcessInPane(agent.pid, candidate.pid, parentOf));
     if (pane) bindings.set(agent.id, { session: pane.session, window: pane.window, pane: pane.pane });
   }
+  debugTmux(`agentPids=${JSON.stringify(list.map((agent) => ({ id: agent.id, pid: agent.pid })))} bindings=${JSON.stringify([...bindings])}`);
   return bindings;
 };
 
