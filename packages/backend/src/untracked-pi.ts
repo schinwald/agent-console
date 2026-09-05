@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import type { TmuxBinding } from './tmux';
+import { logger } from './logger';
 
 export type UntrackedPiProcess = {
   pid: number;
@@ -14,7 +15,10 @@ export const listPiPids = (): number[] => {
       .filter(Boolean)
       .map(Number)
       .filter((pid) => Number.isInteger(pid) && pid > 0);
-  } catch {
+  } catch (error) {
+    logger.debug('untracked-pi', 'Pi process discovery failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return [];
   }
 };

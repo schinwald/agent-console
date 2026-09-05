@@ -9,6 +9,7 @@ import { TmuxBindingIndex } from './bindings';
 import { discoverTmuxBinding, discoverTmuxBindings, matchesTmuxContext, navigateToAgent, type TmuxContext } from './tmux';
 import { findUntrackedPiProcesses, listPiPids } from './untracked-pi';
 import { profile } from '@agent-console/client/profiler';
+import { logger } from './logger';
 
 export const communicationSocket =
   process.env.PI_MANAGER_SOCKET ?? join(homedir(), 'Library', 'Application Support', 'AgentConsole', 'communication.sock');
@@ -76,9 +77,10 @@ function refreshBindings(): void {
   if (signature !== reportedUntrackedPiPids) {
     reportedUntrackedPiPids = signature;
     if (untracked.length > 0) {
-      process.stderr.write(
-        `[agent-console] untracked pi processes=${signature}; restart affected Pi so pi-agent-lifecycle registers it\n`,
-      );
+      logger.warn('backend', 'untracked Pi processes', {
+        processes: untracked,
+        remediation: 'restart affected Pi so pi-agent-lifecycle registers it',
+      });
     }
   }
 }
@@ -100,9 +102,7 @@ refreshBindings();
 function activateIfCurrentTmuxAgent(agentId: string): void {
   const binding = bindings.get(agentId);
   const matches = Boolean(binding && activeTmuxContext && matchesTmuxContext(binding, activeTmuxContext));
-  process.stderr.write(
-    `[agent-console] lifecycle activation agent=${agentId} binding=${JSON.stringify(binding)} activeContext=${JSON.stringify(activeTmuxContext)} matches=${matches}\n`,
-  );
+  logger.debug('backend', 'lifecycle activation', { agentId, binding, activeTmuxContext, matches });
   if (matches) store.setActive(agentId);
 }
 
@@ -130,13 +130,13 @@ store.onSubmission((submission) => {
   broadcastSubmission(submission);
   const agent = agents.get(submission.agentId);
   const boundAgent = agent ? withBinding(agent) : undefined;
-  process.stderr.write(
-    `[agent-console] submission agent=${submission.agentId} binding=${JSON.stringify(
-      boundAgent
-        ? { session: boundAgent.tmuxSession, window: boundAgent.tmuxWindow, pane: boundAgent.tmuxPane, pid: boundAgent.pid }
-        : null,
-    )}\n`,
-  );
+  logger.info('backend', 'submission received', {
+    agentId: submission.agentId,
+    eventId: submission.eventId,
+    binding: boundAgent
+      ? { session: boundAgent.tmuxSession, window: boundAgent.tmuxWindow, pane: boundAgent.tmuxPane, pid: boundAgent.pid }
+      : null,
+  });
   if (boundAgent) navigateToAgent(boundAgent);
 });
 
@@ -208,9 +208,7 @@ function handleCommand(socket: Socket, command: Command): void {
         const activeId = [...bindings.all()].find(([, binding]) =>
           matchesTmuxContext(binding, activeTmuxContext as TmuxContext),
         )?.[0] ?? null;
-        process.stderr.write(
-          `[agent-console] sync tmux active context=${JSON.stringify(activeTmuxContext)} activeId=${activeId}\n`,
-        );
+        logger.debug('backend', 'synced tmux active agent', { activeTmuxContext, activeId });
         store.setActive(activeId);
         break;
       }

@@ -1,13 +1,14 @@
 import { execFileSync } from 'node:child_process';
 import type { AgentMetadata } from '@agent-console/protocol';
+import { logger } from './logger';
 
 export type TmuxContext = { session?: string; window?: string; pane?: string };
 export type TmuxBinding = TmuxContext;
 
 type TmuxPane = TmuxBinding & { pid: number };
 
-const debugTmux = (message: string): void => {
-  if (process.env.AGENT_CONSOLE_DEBUG === '1') process.stderr.write(`[agent-console:debug] ${message}\n`);
+const debugTmux = (message: string, fields: Record<string, unknown> = {}): void => {
+  logger.debug('tmux', message, fields);
 };
 
 export const resolveTmuxSocket = (
@@ -22,10 +23,10 @@ const runTmux = (args: string[]): void => {
   const command = `tmux ${resolvedArgs.join(' ')}`;
   try {
     const stderr = execFileSync('tmux', resolvedArgs, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-    process.stderr.write(`[agent-console] tmux success command=${JSON.stringify(command)} stderr=${JSON.stringify(stderr)}\n`);
+    logger.info('tmux', 'command succeeded', { command, stderr });
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`[agent-console] tmux failure command=${JSON.stringify(command)} error=${JSON.stringify(detail)}\n`);
+    logger.error('tmux', 'command failed', { command, error: detail });
   }
 };
 
@@ -71,7 +72,7 @@ const listPanes = (): TmuxPane[] => {
       })
       .filter((pane) => Number.isInteger(pane.pid) && pane.pid > 0);
   } catch (error) {
-    process.stderr.write(`[agent-console] tmux pane discovery failed error=${JSON.stringify(error instanceof Error ? error.message : String(error))}\n`);
+    logger.warn('tmux', 'pane discovery failed', { error: error instanceof Error ? error.message : String(error) });
     return [];
   }
 };
@@ -79,7 +80,7 @@ const listPanes = (): TmuxPane[] => {
 export const discoverTmuxBindings = (agents: Iterable<AgentMetadata>): Map<string, TmuxBinding> => {
   const list = [...agents];
   const panes = listPanes();
-  debugTmux(`socket=${resolveTmuxSocket()} panes=${JSON.stringify(panes)}`);
+  debugTmux('discovered panes', { socket: resolveTmuxSocket(), panes });
   const parents = new Map<number, number | undefined>();
   const parentOf = (pid: number): number | undefined => {
     if (!parents.has(pid)) parents.set(pid, processParent(pid));
@@ -91,7 +92,7 @@ export const discoverTmuxBindings = (agents: Iterable<AgentMetadata>): Map<strin
     const pane = panes.find((candidate) => isProcessInPane(agent.pid, candidate.pid, parentOf));
     if (pane) bindings.set(agent.id, { session: pane.session, window: pane.window, pane: pane.pane });
   }
-  debugTmux(`agentPids=${JSON.stringify(list.map((agent) => ({ id: agent.id, pid: agent.pid })))} bindings=${JSON.stringify([...bindings])}`);
+  debugTmux('reconciled bindings', { agentPids: list.map((agent) => ({ id: agent.id, pid: agent.pid })), bindings: [...bindings] });
   return bindings;
 };
 
