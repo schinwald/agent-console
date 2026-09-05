@@ -53,7 +53,15 @@ Commands are never broadcast wholesale. The backend publishes only resulting sta
 
 `agent.created` adds an agent to the registry, refreshes tmux bindings, and emits a lifecycle message. `instance.updated` refreshes an existing agent and its bindings; `instance.closed` removes its registry entry and binding.
 
-The backend reconciles registered agents with tmux session, window, and pane bindings. A tmux context synchronization finds the matching bound agent and sets it active. When a newly created or updated agent matches the current tmux context, it also becomes active.
+### Active-context flow
+
+1. The tmux plugin enables focus events, registers `session-window-changed` and `client-session-changed` hooks, and runs an initial synchronization.
+2. A hook reads tmux's active session, window, and pane, then sends a `sync-tmux-active` command over the local socket.
+3. The backend refreshes bindings by listing tmux panes. For every registered agent PID, it walks the PID's parent ancestry until it finds a pane shell PID.
+4. The resulting `agent ID -> session/window/pane` mappings are held in the backend's in-memory binding index; they are projected onto agent responses but do not modify lifecycle agent metadata.
+5. The backend records the hook-reported active context, finds the indexed binding in the same session and window, and sets that agent as active. The pane is recorded as context, but active-agent matching is by session and window.
+
+When a newly created or updated agent's refreshed binding matches the stored active context, it also becomes active.
 
 ## Submission and navigation
 
