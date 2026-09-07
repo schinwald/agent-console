@@ -13,7 +13,7 @@ import { specialKeys, type InputKey } from './input';
 import { clampSelection, filterAgents, moveSelection } from './selection';
 import { statusStyles, visibleLength, workingFrames } from './render';
 import type { Agent, Status } from './types';
-import { parsePlacement } from '../placement';
+import { helpText, parseCommand, versionText } from '../cli';
 import { tmuxPlacementArgs } from '../tmux/placement';
 
 const reset = '\u001b[0m';
@@ -252,9 +252,17 @@ const selectAgent = async (): Promise<Agent | null> => {
 };
 
 const main = async () => {
-  const placement = parsePlacement(argv.slice(2));
-  if (placement !== 'inline') {
-    execFileSync('tmux', tmuxPlacementArgs(placement, execPath), { stdio: 'inherit' });
+  const command = parseCommand(argv.slice(2));
+  if (command.type === 'help') {
+    output.write(helpText);
+    return;
+  }
+  if (command.type === 'version') {
+    output.write(versionText());
+    return;
+  }
+  if (command.placement !== 'inline') {
+    execFileSync('tmux', tmuxPlacementArgs(command.placement, execPath), { stdio: 'inherit' });
     return;
   }
   await selectAgent();

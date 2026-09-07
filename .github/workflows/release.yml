@@ -26,12 +26,41 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Verify release version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+
+          const tag = process.env.TAG;
+          if (!tag?.startsWith('v')) throw new Error(`Expected a v-prefixed tag, received ${tag}`);
+          const version = tag.slice(1);
+          const manifests = [
+            'package.json',
+            'packages/frontend/package.json',
+            'packages/backend/package.json',
+            'packages/client/package.json',
+            'packages/protocol/package.json',
+          ];
+
+          for (const manifest of manifests) {
+            const { version: manifestVersion } = JSON.parse(readFileSync(manifest, 'utf8'));
+            if (manifestVersion !== version) {
+              throw new Error(`${manifest}: expected ${version}, found ${manifestVersion}`);
+            }
+          }
+          NODE
+
       - name: Build standalone executables
+        env:
+          VERSION: ${{ github.ref_name }}
         run: |
           mkdir -p staging/frontend/bin staging/backend/libexec release
+          VERSION="${VERSION#v}"
 
-          bun build packages/frontend/src/ui/app.ts --compile --target=bun-darwin-arm64 --outfile=staging/frontend/bin/agent-console-darwin-arm64
-          bun build packages/frontend/src/ui/app.ts --compile --target=bun-darwin-x64 --outfile=staging/frontend/bin/agent-console-darwin-x86_64
+          bun build packages/frontend/src/ui/app.ts --compile --target=bun-darwin-arm64 --define "AGENT_CONSOLE_VERSION=\"${VERSION}\"" --outfile=staging/frontend/bin/agent-console-darwin-arm64
+          bun build packages/frontend/src/ui/app.ts --compile --target=bun-darwin-x64 --define "AGENT_CONSOLE_VERSION=\"${VERSION}\"" --outfile=staging/frontend/bin/agent-console-darwin-x86_64
           bun build packages/backend/src/backend.ts --compile --target=bun-darwin-arm64 --outfile=staging/backend/libexec/agent-console-backend-darwin-arm64
           bun build packages/backend/src/backend.ts --compile --target=bun-darwin-x64 --outfile=staging/backend/libexec/agent-console-backend-darwin-x86_64
           bun build packages/backend/src/tmux-hook.ts --compile --target=bun-darwin-arm64 --outfile=staging/backend/libexec/agent-console-backend-tmux-hook-darwin-arm64

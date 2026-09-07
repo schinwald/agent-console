@@ -23,6 +23,8 @@ Open the console:
 agent-console
 ```
 
+Show available placement options with `agent-console --help`, or confirm the installed release with `agent-console --version`.
+
 ## Configure tmux
 
 Add Agent Console to your TPM plugin list in `~/.tmux.conf`:
