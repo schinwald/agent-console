@@ -70,7 +70,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-node --input-type=module -- "$version" <<'NODE'
+node --input-type=module - "$version" <<'NODE'
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const version = process.argv[2];
