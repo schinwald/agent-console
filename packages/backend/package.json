@@ -1,6 +1,6 @@
 {
   "name": "@agent-console/backend",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "type": "module",
   "bin": {
     "agent-console-backend": "dist/agent-console-backend"
