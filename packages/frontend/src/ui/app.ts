@@ -11,7 +11,7 @@ import { profileStart } from '@agent-console/client/profiler';
 import { getBoxWidth, getSessionWidth, truncateText } from './layout';
 import { specialKeys, type InputKey } from './input';
 import { clampSelection, filterAgents, moveSelection } from './selection';
-import { statusStyles, visibleLength, workingFrames } from './render';
+import { hasWorkingAgents, statusStyles, visibleLength, workingFrames } from './render';
 import type { Agent, Status } from './types';
 import { helpText, parseCommand, versionText } from '../cli';
 import { tmuxPlacementArgs } from '../tmux/placement';
@@ -44,6 +44,23 @@ const selectAgent = async (): Promise<Agent | null> => {
   let submissionCounter = 0;
   let managerConnection: StateConnection | undefined;
   let viewState: StateMessage['state'] = { focusId: null, activeId: null };
+  let timer: ReturnType<typeof setInterval> | undefined;
+
+  const updateAnimation = () => {
+    if (hasWorkingAgents(agents)) {
+      if (!timer) {
+        timer = setInterval(() => {
+          animationFrame = (animationFrame + 1) % workingFrames.length;
+          render();
+        }, 140);
+      }
+      return;
+    }
+    if (timer) {
+      clearInterval(timer);
+      timer = undefined;
+    }
+  };
 
   let handleInput = (_character: string, _key?: InputKey) => undefined;
 
@@ -72,7 +89,7 @@ const selectAgent = async (): Promise<Agent | null> => {
       output.write(`${borderDim}│${reset} ${styled} ${borderDim}│${reset}\n`);
     };
 
-    output.write('\u001b[2J\u001b[H');
+    output.write('\u001b[H');
     output.write(`${borderDim}╭─${reset}${bold} AGENTS ${reset}${borderDim}${'─'.repeat(boxWidth - 9)}╮${reset}\n`);
     printLine(`${bold}>${reset} ${white}${searchQuery}${reset}${white}█${reset}`);
     output.write(`${borderDim}├${'─'.repeat(boxWidth)}┤${reset}\n`);
@@ -160,8 +177,12 @@ const selectAgent = async (): Promise<Agent | null> => {
   void connectToManager(
     (message: ManagerMessage) => {
       if (message.type === 'state-snapshot' || message.type === 'state-changed') {
+        const stateChanged = viewState.focusId !== message.state.focusId || viewState.activeId !== message.state.activeId;
         viewState = message.state;
-      } else if (message.type === 'search-results') {
+        if (stateChanged) render();
+        return;
+      }
+      if (message.type === 'search-results') {
         agents.splice(
           0,
           agents.length,
@@ -175,10 +196,13 @@ const selectAgent = async (): Promise<Agent | null> => {
             description: typeof data.summary === 'string' ? data.summary : 'No summary',
           })),
         );
-      } else {
+        updateAnimation();
+        render();
+        return;
+      }
+      if (message.type === 'agent.created' || message.type === 'instance.updated' || message.type === 'instance.closed') {
         managerConnection?.search(searchQuery);
       }
-      render();
     },
     () => undefined,
   )
@@ -186,13 +210,12 @@ const selectAgent = async (): Promise<Agent | null> => {
       managerConnection = connection;
       connection.subscribe(['state', 'lifecycle']);
       connection.search('');
-      render();
     })
     .catch(() => undefined);
 
   return new Promise((resolve) => {
     const finish = (agent: Agent | null) => {
-      clearInterval(timer);
+      if (timer) clearInterval(timer);
       input.removeListener('data', onInputData);
       output.removeListener('resize', render);
       input.setRawMode(false);
@@ -242,11 +265,6 @@ const selectAgent = async (): Promise<Agent | null> => {
         render();
       }
     };
-
-    const timer = setInterval(() => {
-      animationFrame = (animationFrame + 1) % workingFrames.length;
-      render();
-    }, 140);
 
   });
 };

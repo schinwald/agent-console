@@ -1,4 +1,4 @@
-import type { Status } from './types';
+import type { Agent, Status } from './types';
 
 export const visibleLength = (value: string): number =>
   value.replace(/\u001b\[[0-9;]*m/g, '').length;
@@ -11,3 +11,6 @@ export const statusStyles: Record<Status, { icon: string; color: string }> = {
 };
 
 export const workingFrames = ['◜', '◝', '◞', '◟'];
+
+export const hasWorkingAgents = (agents: readonly Pick<Agent, 'status'>[]): boolean =>
+  agents.some((agent) => agent.status === 'WORKING');
