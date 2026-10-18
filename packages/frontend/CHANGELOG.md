@@ -1,5 +1,11 @@
 # agent-console
 
+## 0.1.16
+
+### Patch Changes
+
+- Match the overflow indicator color with tmux-session-picker.
+
 ## 0.1.15
 
 ### Patch Changes

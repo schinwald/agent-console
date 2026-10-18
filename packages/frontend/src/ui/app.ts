@@ -137,7 +137,7 @@ const selectAgent = async (): Promise<Agent | null> => {
       const indicator = `${scrollOffset > 0 ? '↑ more' : ''}${
         scrollOffset > 0 && scrollOffset + visibleCount < filteredAgents.length ? ' · ' : ''
       }${scrollOffset + visibleCount < filteredAgents.length ? '↓ more' : ''}`;
-      printLine(`  ${green}${indicator}${reset}`);
+      printLine(`  \u001b[96m${indicator}${reset}`);
       renderedRows += 1;
     }
 
