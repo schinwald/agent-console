@@ -4,6 +4,7 @@ import { createConnection, type Socket } from 'node:net';
 import { join } from 'node:path';
 
 const socketPath = join('/tmp', `pi-manager-test-${process.pid}.sock`);
+const registryPath = join('/tmp', `pi-manager-test-${process.pid}.json`);
 const backendPath = join(import.meta.dir, 'backend.ts');
 let backend: Bun.Subprocess;
 
@@ -48,7 +49,7 @@ describe('manager backend socket', () => {
   beforeAll(async () => {
     if (existsSync(socketPath)) unlinkSync(socketPath);
     backend = Bun.spawn(['bun', 'run', backendPath], {
-      env: { ...process.env, PI_MANAGER_SOCKET: socketPath },
+      env: { ...process.env, PI_MANAGER_SOCKET: socketPath, PI_MANAGER_REGISTRY: registryPath },
       stdout: 'ignore',
       stderr: 'ignore',
     });
@@ -111,18 +112,30 @@ describe('manager backend socket', () => {
     subscriber.destroy();
   });
 
-  test('forwards lifecycle events to lifecycle subscribers', async () => {
+  test('replays lifecycle snapshot before subsequent events', async () => {
+    const existing = await connect();
+    send(existing, {
+      type: 'agent.created',
+      data: { id: 'existing-agent', tmuxSession: 'existing-session', tmuxWindow: '@0' },
+    });
+    expect((await nextMessage(existing)).type).toBe('ack');
+    existing.destroy();
+
     const subscriber = await connect();
     send(subscriber, { type: 'subscribe', topics: ['lifecycle'] });
     expect((await nextMessage(subscriber)).type).toBe('state-snapshot');
+    expect(await nextMessage(subscriber)).toEqual({
+      type: 'agent.created',
+      agent: { id: 'existing-agent', tmuxSession: 'existing-session', tmuxWindow: '@0' },
+    });
+
     const producer = await connect();
     send(producer, {
       type: 'agent.created',
       data: { id: 'created-agent', tmuxSession: 'integration-session', tmuxWindow: '@1' },
     });
 
-    const message = await nextMessage(subscriber);
-    expect(message).toEqual({
+    expect(await nextMessage(subscriber)).toEqual({
       type: 'agent.created',
       agent: { id: 'created-agent', tmuxSession: 'integration-session', tmuxWindow: '@1' },
     });

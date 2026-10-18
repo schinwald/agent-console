@@ -5,7 +5,7 @@ import { readActiveContext } from './tmux';
 import type { ManagerCommand } from '@agent-console/protocol';
 
 const communicationSocket =
-  process.env.PI_MANAGER_SOCKET ?? join(homedir(), 'Library', 'Application Support', 'AgentConsole', 'communication.sock');
+  process.env.PI_MANAGER_SOCKET ?? join(homedir(), '.pi', 'agent', 'runtime', 'pi-agent-lifecycle', 'communication.sock');
 const context = readActiveContext();
 const command: ManagerCommand = {
   type: 'sync-tmux-active',

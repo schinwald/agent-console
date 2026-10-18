@@ -17,7 +17,7 @@ pnpm dev:backend
 The default socket is:
 
 ```text
-~/Library/Application Support/AgentConsole/communication.sock
+~/.pi/agent/runtime/pi-agent-lifecycle/communication.sock
 ```
 
 Check readiness:
@@ -70,7 +70,7 @@ New Pi sessions emit `agent.created`. The backend registers the agent, reconcile
 Check the socket:
 
 ```bash
-[[ -S "$HOME/Library/Application Support/AgentConsole/communication.sock" ]] && echo communication-ok
+[[ -S "$HOME/.pi/agent/runtime/pi-agent-lifecycle/communication.sock" ]] && echo communication-ok
 ```
 
 Check tmux hooks:

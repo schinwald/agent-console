@@ -11,7 +11,7 @@ import { profileStart } from '@agent-console/client/profiler';
 import { getBoxWidth, getSessionWidth, truncateText } from './layout';
 import { specialKeys, type InputKey } from './input';
 import { clampSelection, filterAgents, moveSelection } from './selection';
-import { hasWorkingAgents, statusStyles, visibleLength, workingFrames } from './render';
+import { hasWorkingAgents, safeStatus, statusStyles, visibleLength, workingFrames } from './render';
 import type { Agent, Status } from './types';
 import { helpText, parseCommand, versionText } from '../cli';
 import { tmuxPlacementArgs } from '../tmux/placement';
@@ -81,26 +81,27 @@ const selectAgent = async (): Promise<Agent | null> => {
       agents.map((agent) => agent.tmuxSession.length),
     );
 
+    let frame = '\u001b[H';
     const printLine = (content = '', selected = false) => {
       const padding = ' '.repeat(Math.max(0, boxWidth - 2 - visibleLength(content)));
       const styled = selected
         ? `${selectedBackground}${content.replaceAll(reset, `${reset}${selectedBackground}`)}${padding}${reset}`
         : `${content}${padding}`;
-      output.write(`${borderDim}│${reset} ${styled} ${borderDim}│${reset}\n`);
+      frame += `${borderDim}│${reset} ${styled} ${borderDim}│${reset}\n`;
     };
 
-    output.write('\u001b[H');
-    output.write(`${borderDim}╭─${reset}${bold} AGENTS ${reset}${borderDim}${'─'.repeat(boxWidth - 9)}╮${reset}\n`);
+    frame += `${borderDim}╭─${reset}${bold} AGENTS ${reset}${borderDim}${'─'.repeat(boxWidth - 9)}╮${reset}\n`;
     printLine(`${bold}>${reset} ${white}${searchQuery}${reset}${white}█${reset}`);
-    output.write(`${borderDim}├${'─'.repeat(boxWidth)}┤${reset}\n`);
+    frame += `${borderDim}├${'─'.repeat(boxWidth)}┤${reset}\n`;
 
     let renderedRows = 3;
     filteredAgents.forEach((agent, index) => {
       const selected = viewState.focusId !== null
         ? agent.id === viewState.focusId
         : index === selectedIndex;
-      const style = statusStyles[agent.status];
-      const icon = agent.status === 'WORKING' ? workingFrames[animationFrame] : style.icon;
+      const displayStatus = safeStatus(agent.status);
+      const style = statusStyles[displayStatus];
+      const icon = displayStatus === 'WORKING' ? workingFrames[animationFrame] : style.icon;
       const marker = selected ? `${selection}▌${reset}` : ' ';
       const active = agent.id === viewState.activeId;
       const activeLabel = active ? ` ${green}(active)${reset}` : '';
@@ -108,7 +109,7 @@ const selectAgent = async (): Promise<Agent | null> => {
       const paddedSession = `${white}${tmuxSession}${reset}${activeLabel}${' '.repeat(
         Math.max(0, sessionWidth - tmuxSession.length),
       )}`;
-      const status = `${style.color}${agent.status}${reset}`;
+      const status = `${style.color}${displayStatus}${reset}`;
       const prefix = `${marker} ${style.color}${icon}${reset} ${paddedSession}`;
       const statusGap = ' '.repeat(
         Math.max(1, boxWidth - 2 - visibleLength(prefix) - visibleLength(status)),
@@ -132,7 +133,8 @@ const selectAgent = async (): Promise<Agent | null> => {
       printLine();
       renderedRows += 1;
     }
-    output.write(`${borderDim}╰${'─'.repeat(boxWidth)}╯${reset}`);
+    frame += `${borderDim}╰${'─'.repeat(boxWidth)}╯${reset}`;
+    output.write(frame);
     finishProfile();
   };
 
@@ -192,7 +194,8 @@ const selectAgent = async (): Promise<Agent | null> => {
             tmuxWindow: typeof data.tmuxWindow === 'string' ? data.tmuxWindow : undefined,
             tmuxPane: typeof data.tmuxPane === 'string' ? data.tmuxPane : undefined,
             pid: typeof data.pid === 'number' ? data.pid : undefined,
-            status: String(data.status ?? 'IDLE').toUpperCase() as Status,
+            // status is legacy; additive lifecycle fields take precedence when present.
+            status: safeStatus(String(data.agentStatus ?? data.processState ?? data.status ?? 'IDLE').toUpperCase()),
             description: typeof data.summary === 'string' ? data.summary : 'No summary',
           })),
         );

@@ -48,7 +48,7 @@ Confirm the service is running and the backend socket is ready:
 
 ```bash
 brew services info agent-console-backend
-[[ -S "$HOME/Library/Application Support/AgentConsole/communication.sock" ]] && echo communication-ok
+[[ -S "$HOME/.pi/agent/runtime/pi-agent-lifecycle/communication.sock" ]] && echo communication-ok
 ```
 
 Confirm tmux integration is installed:

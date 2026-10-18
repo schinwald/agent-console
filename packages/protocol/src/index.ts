@@ -5,6 +5,14 @@ export type ViewState = {
 
 export type AgentMetadata = {
   id: string;
+  /** Legacy presentation status, retained for existing consumers. */
+  status?: string;
+  /** Additive lifecycle state from pi-agent-lifecycle. */
+  agentStatus?: string;
+  processState?: string;
+  terminationReason?: string;
+  terminationCode?: number | string;
+  terminatedAt?: string | number;
   tmuxSession?: string;
   tmuxWindow?: string;
   tmuxPane?: string;
@@ -40,8 +48,8 @@ export type StateMessage = {
 };
 
 export type LifecycleMessage =
-  | { type: 'agent.created'; agent: AgentMetadata }
-  | { type: 'instance.updated' | 'instance.closed'; data: Record<string, unknown> };
+  | { type: 'agent.created'; agent: AgentMetadata; revision?: number }
+  | { type: 'instance.updated' | 'instance.closed'; data: AgentMetadata; revision?: number };
 
 export type SearchResultsMessage = {
   type: 'search-results';

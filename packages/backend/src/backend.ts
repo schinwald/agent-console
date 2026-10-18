@@ -12,7 +12,7 @@ import { profile } from '@agent-console/client/profiler';
 import { logger } from './logger';
 
 export const communicationSocket =
-  process.env.PI_MANAGER_SOCKET ?? join(homedir(), 'Library', 'Application Support', 'AgentConsole', 'communication.sock');
+  process.env.PI_MANAGER_SOCKET ?? join(homedir(), '.pi', 'agent', 'runtime', 'pi-agent-lifecycle', 'communication.sock');
 
 type AgentCreated = AgentMetadata;
 type Command = ManagerCommand;
@@ -25,7 +25,8 @@ const registryPath = process.env.PI_MANAGER_REGISTRY ?? join(homedir(), '.pi', '
 try {
   const registry = JSON.parse(readFileSync(registryPath, 'utf8')) as { instances?: Record<string, AgentMetadata & { status?: string }> };
   for (const agent of Object.values(registry.instances ?? {})) {
-    if (agent.status !== 'closed') agents.set(agent.id, agent);
+    // Accept both the legacy status and additive lifecycle agentStatus.
+    if (agent.status !== 'closed' && agent.agentStatus !== 'closed') agents.set(agent.id, agent);
   }
 } catch {
   // Lifecycle events will populate the backend when the registry is unavailable.
@@ -34,6 +35,7 @@ const subscribers = new Map<Socket, Set<string>>();
 const submissionDeduper = new SubmissionDeduper();
 let activeTmuxContext: TmuxContext | null = null;
 let reportedUntrackedPiPids = ''; 
+let lifecycleRevision = 0;
 function send(socket: Socket, message: Message): void {
   if (!socket.destroyed) socket.write(`${JSON.stringify(message)}\n`);
 }
@@ -61,8 +63,10 @@ function broadcastSubmission(submission: Submission): void {
 }
 
 function broadcastLifecycle(message: Message): void {
+  lifecycleRevision += 1;
+  const revised = { ...message, revision: lifecycleRevision } as Message;
   for (const [socket, topics] of subscribers) {
-    if (topics.has('lifecycle')) send(socket, message);
+    if (topics.has('lifecycle')) send(socket, topics.has('lifecycle-revisions') ? revised : message);
   }
 }
 
@@ -151,6 +155,11 @@ function handleCommand(socket: Socket, command: Command): void {
           state: snapshot.state,
           revision: snapshot.revision,
         });
+        if ((command.topics ?? ['state']).includes('lifecycle')) {
+          for (const agent of agents.values()) {
+            send(socket, { type: 'agent.created', agent: withBinding(agent), ...( (command.topics ?? []).includes('lifecycle-revisions') ? { revision: lifecycleRevision } : {}) });
+          }
+        }
         return;
       }
       case 'agent.created':
