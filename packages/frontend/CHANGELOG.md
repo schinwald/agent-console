@@ -1,5 +1,11 @@
 # agent-console
 
+## 0.1.15
+
+### Patch Changes
+
+- Limit the agent list to the available terminal height and add scrolling indicators for larger agent sets.
+
 ## 0.1.14
 
 ### Patch Changes

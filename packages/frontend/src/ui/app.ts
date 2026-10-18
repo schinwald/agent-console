@@ -36,6 +36,7 @@ const selectAgent = async (): Promise<Agent | null> => {
   }
 
   let selectedIndex = 0;
+  let scrollOffset = 0;
   let searchQuery = '';
   let filteredAgents = agents;
   let selectionRows = new Map<number, number>();
@@ -74,6 +75,11 @@ const selectAgent = async (): Promise<Agent | null> => {
       : -1;
     if (stateFocusedIndex >= 0) selectedIndex = stateFocusedIndex;
     selectedIndex = clampSelection(selectedIndex, filteredAgents.length);
+    const visibleCount = Math.max(1, Math.floor(Math.max(1, (output.rows || 25) - 6) / 2));
+    if (selectedIndex < scrollOffset) scrollOffset = selectedIndex;
+    if (selectedIndex >= scrollOffset + visibleCount) scrollOffset = selectedIndex - visibleCount + 1;
+    scrollOffset = Math.max(0, Math.min(scrollOffset, Math.max(0, filteredAgents.length - visibleCount)));
+    const visibleAgents = filteredAgents.slice(scrollOffset, scrollOffset + visibleCount);
     selectionRows = new Map();
 
     const sessionWidth = getSessionWidth(
@@ -95,7 +101,8 @@ const selectAgent = async (): Promise<Agent | null> => {
     frame += `${borderDim}├${'─'.repeat(boxWidth)}┤${reset}\n`;
 
     let renderedRows = 3;
-    filteredAgents.forEach((agent, index) => {
+    visibleAgents.forEach((agent, visibleIndex) => {
+      const index = scrollOffset + visibleIndex;
       const selected = viewState.focusId !== null
         ? agent.id === viewState.focusId
         : index === selectedIndex;
@@ -125,6 +132,12 @@ const selectAgent = async (): Promise<Agent | null> => {
 
     if (filteredAgents.length === 0) {
       printLine(`${dim}No matching agents${reset}`);
+      renderedRows += 1;
+    } else if (scrollOffset > 0 || scrollOffset + visibleCount < filteredAgents.length) {
+      const indicator = `${scrollOffset > 0 ? '↑ more' : ''}${
+        scrollOffset > 0 && scrollOffset + visibleCount < filteredAgents.length ? ' · ' : ''
+      }${scrollOffset + visibleCount < filteredAgents.length ? '↓ more' : ''}`;
+      printLine(`  ${green}${indicator}${reset}`);
       renderedRows += 1;
     }
 
@@ -247,6 +260,7 @@ const selectAgent = async (): Promise<Agent | null> => {
       if (key?.name === 'backspace') {
         searchQuery = searchQuery.slice(0, -1);
         selectedIndex = 0;
+        scrollOffset = 0;
         managerConnection?.search(searchQuery);
         return render();
       }
@@ -264,6 +278,7 @@ const selectAgent = async (): Promise<Agent | null> => {
       if (character && character >= ' ' && !key?.ctrl) {
         searchQuery += character;
         selectedIndex = 0;
+        scrollOffset = 0;
         managerConnection?.search(searchQuery);
         render();
       }
